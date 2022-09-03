@@ -217,9 +217,9 @@ local function craftlist_form(data)
 		for k,v in ipairs{"1","10","100"} do
 			form=form..("button[%s,4;0.9,0.8;glcraft_crafts_craft_%s;+%s]"):format((k-1)*0.7+0.7,v,v)
 		end
-		if data.count then
-			form=form..("label[3,4.15;%s]"):format(data.count)
-		end
+	end
+	if data.count then
+		form=form..("label[3,4.15;%s]"):format(data.count)
 	end
 	if data.recipe then
 		form=form.."container[0,0.5]"
