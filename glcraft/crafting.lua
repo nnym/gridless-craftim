@@ -14,11 +14,21 @@ local cg_ctypes={shaped=true,shapeless=true,toolrepair=true}
 
 local scan_usages,scan_usages_now,plan_usage_scan
 
+local function resolve_alias(name)
+	local ali=minetest.registered_aliases[name]
+	if ali then
+		return resolve_alias(ali)
+	else
+		return name
+	end
+end
+
 local function scan_recipes()
 	shlocals.scan_groups_now()
 	recipes={}
 	for item,crafts in pairs(minetest.registered_crafts) do
 		for recipe,_ in pairs(crafts) do
+			local item=resolve_alias(item)
 			recipes[item]=recipes[item] or {}
 			recipes[item][recipe]=true
 		end
@@ -45,6 +55,7 @@ local function scan_ur(recipe)
 	end
 	for k,v in pairs(recip) do
 		v=ItemStack(v):get_name()
+		v=resolve_alias(v)
 		if v~="" then
 			if v:sub(1,6)=="group:" then
 				local gg=shlocals.item_groups[v:sub(7,-1)]
@@ -81,28 +92,52 @@ minetest.register_craft=plan_recipe_scan(minetest.register_craft)
 minetest.clear_craft=plan_recipe_scan(minetest.clear_craft)
 shlocals.scan_groups=plan_recipe_scan(shlocals.scan_groups)
 
+local function apply_replacements(rp,inp)
+	for k,re in ipairs(rp) do
+		if re[1]==inp then
+			table.remove(rp,k)
+			return re[2]
+		end
+	end
+	return nil
+end
+
 local function get_recipe_inputs(recipe)
 	local inputs={}
 	local rt=recipe.type or "shaped"
 	local valid=true
+	local grid={replacements={},recipe={}}
+	local rp={}
+	for k,v in ipairs(recipe.replacements or {}) do
+		rp[k]=v
+	end
 	if rt=="shaped" then
-		for k,v in pairs(recipe.recipe) do
-			for k,v in pairs(v) do
+		for y,v in pairs(recipe.recipe) do
+			grid.recipe[y]={}
+			for x,v in pairs(v) do
 				table.insert(inputs,v)
+				grid.recipe[#inputs]=(y-1)*3+x
+				grid.replacements[(y-1)*3+x]=apply_replacements(rp,v)
 			end
 		end
 	elseif rt=="shapeless" then
 		for k,v in pairs(recipe.recipe) do
 			table.insert(inputs,v)
+			grid.recipe[k]=#inputs
+			grid.replacements[k]=apply_replacements(rp,v)
 		end
 	elseif rt=="toolrepair" then
 		for n=1,2 do
 			table.insert(inputs,ItemStack(recipe.output):get_name())
+			grid.recipe[n]=n
 		end
 	else
 		valid=false
 	end
-	return valid and inputs
+	for k,v in pairs(inputs) do
+		inputs[k]=resolve_alias(v)
+	end
+	return valid and inputs,grid
 end
 
 local function check_recipe_input(inp,name)
@@ -172,19 +207,32 @@ end
 
 function glcraft.craft(inv,ilname,olname,recipe,count,player,pos)
 	local pos = pos or player:get_pos()
-	local il=inv:get_list(ilname)
-	local inputs=get_recipe_inputs(recipe)
+	local inputs,gg=get_recipe_inputs(recipe)
 	local countz=0
+	local outs={}
 	if inputs then
 		for n=1,count do
+			local il=inv:get_list(ilname)
 			local sati=true
-			for _,inp in pairs(inputs) do
+			local cg={}
+			for n=1,9 do
+				cg[n]=ItemStack()
+			end
+			for k,inp in pairs(inputs) do
 				if inp~="" then
 					local satisfied=false
 					for _,item in ipairs(il) do
 						local name=item:get_name()
 						if name~="" and check_recipe_input(inp,name) then
-							item:take_item(1)
+							cg[gg.recipe[k]]=item:take_item(1)
+							satisfied=true
+							break
+						end
+					end
+					for _,item in ipairs(outs) do
+						local name=item:get_name()
+						if name~="" and check_recipe_input(inp,name) then
+							cg[gg.recipe[k]]=item:take_item(1)
 							satisfied=true
 							break
 						end
@@ -193,6 +241,34 @@ function glcraft.craft(inv,ilname,olname,recipe,count,player,pos)
 				end
 			end
 			if sati then
+				local crl=inv:get_list("craft")
+				local em={}
+				for n=1,9 do
+					em[n]=ItemStack()
+				end
+				for k,v in pairs(gg.replacements) do
+					em[k]=ItemStack(v)
+				end
+				inv:set_list("craft",em)
+				local out=ItemStack(recipe.output)
+				for k,v in ipairs(minetest.registered_on_crafts) do
+					local ccg={}
+					for k,v in pairs(cg) do
+						ccg[k]=ItemStack(v)
+					end
+					local oout=v(out,player,ccg,inv)
+					if oout~=nil then
+						out=oout
+					end
+				end
+				table.insert(outs,out)
+				em=inv:get_list("craft",em)
+				for k,v in ipairs(em) do
+					if v:get_count()>0 then
+						table.insert(outs,v)
+					end
+				end
+				inv:set_list("craft",crl)
 				inv:set_list(ilname,il)
 				countz=countz+1
 			else
@@ -200,10 +276,12 @@ function glcraft.craft(inv,ilname,olname,recipe,count,player,pos)
 			end
 		end
 	end
-	for n=1,countz do
-		local left=inv:add_item(olname,ItemStack(recipe.output))
-		if left:get_count()>0 then
-			minetest.item_drop(left,dropper,pos)
+	for k,v in ipairs(outs) do
+		if v:get_count()>0 then
+			local left=inv:add_item(olname,ItemStack(v))
+			if left:get_count()>0 then
+				minetest.item_drop(left,dropper,pos)
+			end
 		end
 	end
 	return countz

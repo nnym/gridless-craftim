@@ -3,6 +3,7 @@ local shlocals={}
 
 local player_data={}
 local item_groups={}
+local DEBUG_CG=false
 shlocals.player_data=player_data
 shlocals.item_groups=item_groups
 
@@ -384,16 +385,29 @@ minetest.register_globalstep(function(dt)
 	end
 end)
 
-sfinv.override_page("sfinv:crafting", {
-	get = function(self, player, context)
+do
+	local get = function(self, player, context)
 		make_data(player)
 		return sfinv.make_formspec(player, context, get_formspec(player), true)
-	end,
-        on_player_receive_fields = function(self, player, context, fields)
+	end
+        local on_player_receive_fields = function(self, player, context, fields)
 		if on_receive_fields(player,fields) then
 			sfinv.set_player_inventory_formspec(player)
 		end
         end
-})
+	
+	if DEBUG_CG then
+		sfinv.register_page("glcraft:crafting",{
+			title="Autocraft",
+			get=get,
+			on_player_receive_fields=on_player_receive_fields
+		})
+	else
+		sfinv.override_page("sfinv:crafting", {
+			get=get,
+			on_player_receive_fields=on_player_receive_fields
+		})
+	end
+end
 
 include(modpath.."/crafting.lua",shlocals)
