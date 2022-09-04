@@ -4,7 +4,7 @@ local plan_f=shlocals.plan_f
 local recipes_custom={}
 local recipes={}
 local usages={}
-local cg_ctypes={shaped=true,shapeless=true,toolrepair=true}
+local cg_ctypes={shaped=true,shapeless=true}
 
 --function glcraft.register_recipe()
 --end
@@ -39,9 +39,7 @@ end
 local function scan_ur(recipe)
 	shlocals.scan_groups_now()
 	local recip=recipe.recipe or {}
-	if recipe.type=="toolrepair" then
-		recip={recipe.output}
-	elseif type(recip)=="string" then
+	if type(recip)=="string" then
 		recip={recip}
 	end
 	if type(recip[1])=="table" then
@@ -125,11 +123,6 @@ local function get_recipe_inputs(recipe)
 			table.insert(inputs,v)
 			grid.recipe[k]=#inputs
 			grid.replacements[k]=apply_replacements(rp,v)
-		end
-	elseif rt=="toolrepair" then
-		for n=1,2 do
-			table.insert(inputs,ItemStack(recipe.output):get_name())
-			grid.recipe[n]=n
 		end
 	else
 		valid=false

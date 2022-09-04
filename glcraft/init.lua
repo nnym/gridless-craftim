@@ -149,9 +149,6 @@ local function display_recipe(recipe,count)
 	local rt=recipe.type or "shaped"
 	if rt=="shapeless" then
 		grid=recipe.recipe
-	elseif rt=="toolrepair" then
-		local out=ItemStack(recipe.output):get_name()
-		grid={out,out}
 	elseif rt=="shaped" then
 		for k,v in ipairs(recipe.recipe) do
 			for k,v in ipairs(v) do
