@@ -1,10 +1,90 @@
-local shlocals = ...
-local plan_f=shlocals.plan_f
+local E = ...
 
-local recipes_custom={}
-local recipes={}
-local usages={}
-local cg_ctypes={shaped=true,shapeless=true}
+E.recipes_custom={}
+E.recipes={}
+E.usages={}
+E.cg_ctypes={shaped=true,shapeless=true}
+E.item_groups={}
+local table_eq=E.table_eq
+
+function E.parse_groups(g)
+	local g=ItemStack(g):get_name()
+	if g:sub(1,6)=="group:" then
+		local g=g:sub(7)
+		local grs={}
+		for gr in g:gmatch("([^,]+),?") do
+			table.insert(grs,gr)
+		end
+		return grs
+	end
+end
+
+function E.find_of_groups(items,groups)
+	local gi={}
+	for _,group in pairs(groups) do
+		if E.item_groups[group] then
+			for _,item in pairs(E.item_groups[group].list) do
+				if items[item] then
+					gi[item]=true
+				end
+			end
+		end
+	end
+	return gi
+end
+
+function E.replace_gritem(src,dst)
+	local src1=ItemStack(src):get_name()
+	local groups=E.parse_groups(src1)
+	if not groups then return src end
+	local dst1=ItemStack(dst):get_name()
+	if E.find_of_groups({[dst1]=true},groups)[dst1] then
+		local count=ItemStack(src):get_count()
+		local dst=ItemStack(dst1)
+		dst:set_count(count)
+		return dst:to_string()
+	end
+	return src
+end
+
+local function gridify_list(grid)
+	local gg,grid=grid,{}
+	do
+		local x,y=1,1
+		for k,v in ipairs(gg) do
+			grid[y]=grid[y]or{}
+			grid[y][x]=v
+			x=x+1
+			if x>3 then
+				x,y=1,y+1
+			end
+		end
+	end
+	return grid
+end
+E.gridify_list=gridify_list
+
+local function shapeless_sort(grid)
+	local gg=grid
+	local grid={}
+	for k,v in pairs(gg) do
+		grid[v]=(grid[v] or 0)+1
+	end
+	gg,grid=grid,{}
+	for k,v in pairs(gg) do
+		local is=ItemStack(k)
+		is:set_count(v)
+		table.insert(grid,is:to_string())
+	end
+	table.sort(grid)
+	return grid
+end
+E.shapeless_sort=shapeless_sort
+
+local function shapeless_gridify(grid)
+	return gridify_list(shapeless_sort(grid))
+end
+E.shapeless_gridify=shapeless_gridify
 
 --function glcraft.register_recipe()
 --end
@@ -12,33 +92,81 @@ local cg_ctypes={shaped=true,shapeless=true}
 --function glcraft.unregister_recipe()
 --end
 
-local scan_usages,scan_usages_now,plan_usage_scan
+function E.scan_groups()
+	E.item_groups={}
+	for name,item in pairs(minetest.registered_items) do
+		for group,amount in pairs(item.groups) do
+			if (type(amount)=="number" and amount>0) or (type(amount)~="number" and amount) then
+				E.item_groups[group] = E.item_groups[group] or {list={},map={}}
+				E.item_groups[group].map[name] = true
+				table.insert(E.item_groups[group].list,name)
+			end
+		end
+	end
+end
 
-local function resolve_alias(name)
+E.plan_group_scan,E.scan_groups_now=E.plan_f(E.wrap_tfun(E,"scan_groups"))
+E.plan_group_scan()
+for _,fname in pairs{"register_item","override_item","unregister_item"} do
+	minetest[fname]=E.plan_group_scan(minetest[fname])
+end
+
+function E.resolve_alias(name)
 	local ali=minetest.registered_aliases[name]
 	if ali then
-		return resolve_alias(ali)
+		return E.resolve_alias(ali)
 	else
 		return name
 	end
 end
 
-local function scan_recipes()
-	shlocals.scan_groups_now()
-	recipes={}
+function E.scan_recipes()
+	E.scan_groups_now()
+	E.recipes={}
 	for item,crafts in pairs(minetest.registered_crafts) do
 		for recipe,_ in pairs(crafts) do
-			local item=resolve_alias(item)
-			recipes[item]=recipes[item] or {}
-			recipes[item][recipe]=true
+			local item=E.resolve_alias(item)
+			E.recipes[item]=E.recipes[item] or {}
+			E.recipes[item][recipe]=true
 		end
 	end
-	scan_usages_now(true)
-	minetest.safe_file_write(minetest.get_worldpath().."/glcraft_recipes.txt",dump{recipes=recipes,usages=usages})
+	for k,v in pairs(minetest.registered_nodes) do
+		if v.drop and minetest.get_item_group(k,"not_in_creative_inventory")==0 then
+			local recip={type="custom",recip_icon={tooltip="Digging",icon="default_tool_steelpick.png"}}
+			recip.inputs={{k}}
+			local valid=true
+			local oouts={}
+			if type(v.drop)=="string" and v.drop~="" then
+				recip.outputs={{v.drop}}
+				oouts={ItemStack(v.drop):get_name()}
+			elseif type(v.drop)=="table" then
+				local outs={}
+				for k,v in ipairs(v.drop.items) do
+					for k,v in ipairs(v.items) do
+						outs[ItemStack(v):get_name()]=true
+					end
+				end
+				local outs,oo={},outs
+				for k,v in pairs(oo) do
+					table.insert(outs,k)
+				end
+				oouts=outs
+				recip.outputs=shapeless_gridify(outs)
+			else
+				valid=false
+			end
+			if valid and #oouts>0 and not table_eq(recip.inputs,recip.outputs) then
+				for k,v in ipairs(oouts) do
+					E.recipes[v]=E.recipes[v] or {}
+					E.recipes[v][recip]=true
+				end
+			end
+		end
+	end
+	E.scan_usages_now(true)
 end
 local function scan_ur(recipe)
-	shlocals.scan_groups_now()
-	local recip=recipe.recipe or {}
+	local recip=recipe.recipe or recipe.inputs or {}
 	if type(recip)=="string" then
 		recip={recip}
 	end
@@ -53,42 +181,43 @@ local function scan_ur(recipe)
 	end
 	for k,v in pairs(recip) do
 		v=ItemStack(v):get_name()
-		v=resolve_alias(v)
+		v=E.resolve_alias(v)
 		if v~="" then
 			if v:sub(1,6)=="group:" then
-				local gg=shlocals.item_groups[v:sub(7,-1)]
+				local gg=E.item_groups[v:sub(7,-1)]
 				if gg then
 					for k,v in pairs(gg.list) do
-						usages[v]=usages[v] or {}
-						usages[v][recipe]=true
+						E.usages[v]=E.usages[v] or {}
+						E.usages[v][recipe]=true
 					end
 				end
 			else
-				usages[v]=usages[v] or {}
-				usages[v][recipe]=true
+				E.usages[v]=E.usages[v] or {}
+				E.usages[v][recipe]=true
 			end
 		end
 	end
 end
-scan_usages = function()
-	usages={}
-	for item,crafts in pairs(recipes) do
+E.scan_usages = function()
+	E.scan_groups_now()
+	E.usages={}
+	for item,crafts in pairs(E.recipes) do
 		for recipe,_ in pairs(crafts) do
 			scan_ur(recipe)
 		end
 	end
-	for item,crafts in pairs(recipes_custom) do
+	for item,crafts in pairs(E.recipes_custom) do
 		for recipe,_ in pairs(crafts) do
 			scan_ur(recipe)
 		end
 	end
 end
-local plan_recipe_scan,scan_recipes_now = plan_f(scan_recipes)
-plan_usage_scan,scan_usages_now = plan_f(scan_usages)
-plan_recipe_scan()
-minetest.register_craft=plan_recipe_scan(minetest.register_craft)
-minetest.clear_craft=plan_recipe_scan(minetest.clear_craft)
-shlocals.scan_groups=plan_recipe_scan(shlocals.scan_groups)
+E.plan_recipe_scan,E.scan_recipes_now = E.plan_f(E.wrap_tfun(E,"scan_recipes"))
+E.plan_usage_scan,E.scan_usages_now = E.plan_f(E.wrap_tfun(E,"scan_usages"))
+E.plan_recipe_scan()
+minetest.register_craft=E.plan_recipe_scan(minetest.register_craft)
+minetest.clear_craft=E.plan_recipe_scan(minetest.clear_craft)
+E.scan_groups=E.plan_recipe_scan(E.scan_groups)
 
 local function apply_replacements(rp,inp)
 	for k,re in ipairs(rp) do
@@ -128,7 +257,7 @@ local function get_recipe_inputs(recipe)
 		valid=false
 	end
 	for k,v in pairs(inputs) do
-		inputs[k]=resolve_alias(v)
+		inputs[k]=E.resolve_alias(v)
 	end
 	return valid and inputs,grid
 end
@@ -136,10 +265,100 @@ end
 local function check_recipe_input(inp,name)
 	local inp=inp
 	if inp:sub(1,6)=="group:" then
-		local gg=shlocals.item_groups[inp:sub(7,-1)]
+		local gg=E.item_groups[inp:sub(7,-1)]
 		inp=(gg and gg.map[name]) and name or ""
 	end
 	return name==inp
+end
+
+function E.display_recipe(recipe,count,prefix,compress,imap,gritem)
+	local count=count or 1
+	local grid,outputs={},{}
+	local shapeless
+	local rt=recipe.type or "shaped"
+	local recip_icon
+	if rt=="shapeless" then
+		grid=recipe.recipe
+		shapeless=true
+		recip_icon={tooltip="Shapeless",icon="craftguide_shapeless.png"}
+	elseif rt=="shaped" then
+		if compress then
+			for k,v in ipairs(recipe.recipe) do
+				for k,v in ipairs(v) do
+					if v~="" then
+						table.insert(grid,v)
+					end
+				end
+			end
+			shapeless=true
+		else
+			grid=recipe.recipe
+			shapeless=false
+		end
+	elseif rt=="fuel" then
+		grid={{recipe.recipe}}
+		local rp={}
+		for k,v in ipairs(recipe.replacements or {}) do
+			rp[k]=v
+		end
+		outputs={{function(x,y) return ("image[%s,%s;1,1;fire_basic_flame.png]tooltip[%s,%s;0.8,0.8;Fuel: %ss]"):format(x,y,x,y,recipe.burntime) end,
+		apply_replacements(rp,recipe.recipe)}}
+	elseif rt=="cooking" then
+		grid={{recipe.recipe}}
+		outputs={{recipe.output}}
+		recip_icon={tooltip=recipe.cooktime and ("Cooking: %ss"):format(recipe.cooktime) or "Cooking",icon="default_furnace_front.png"}
+	elseif rt=="custom" then
+		grid,outputs=recipe.inputs,recipe.outputs
+		assert(grid and outputs,"bad boy recipe")
+		recip_icon=recipe.recip_icon
+	else
+		error("what is this recipe")
+	end
+	if shapeless then
+		grid=shapeless_gridify(grid)
+	end
+	if E.cg_ctypes[rt] then
+		local ii,grr=get_recipe_inputs(recipe)
+		local its=ItemStack(recipe.output)
+		local count=its:get_count()
+		its:set_count(1)
+		its=its:to_string()
+		for n=1,count do
+			table.insert(outputs,its)
+		end
+		local repls={}
+		for k,v in pairs(grr.replacements) do
+			local its=ItemStack(v)
+			local count=its:get_count()
+			its:set_count(1)
+			its=its:to_string()
+			for n=1,count do
+				table.insert(repls,its)
+			end
+		end
+		outputs=shapeless_sort(outputs)
+		repls=shapeless_sort(repls)
+		for k,v in ipairs(repls) do
+			table.insert(outputs,v)
+		end
+		outputs=gridify_list(outputs)
+	end
+	if gritem then
+		local gg=grid
+		grid={}
+		for y,v in pairs(gg) do
+			grid[y]={}
+			for x,v in pairs(v) do
+				grid[y][x]=v
+			end
+		end
+		for y,v in pairs(grid) do
+			for x,i in pairs(v) do
+				v[x]=E.replace_gritem(i,gritem)
+			end
+		end
+	end
+	return E.display_recipe_raw({inputs=grid,outputs=outputs,recip_icon=recip_icon},count,prefix,imap)
 end
 
 function glcraft.get_craftables(inv,lname)
@@ -150,8 +369,8 @@ function glcraft.get_craftables(inv,lname)
 		local name=item:get_name()
 		if name ~= "" then
 			if not items[name] then
-				if usages[name] then
-					for k,v in pairs(usages[name]) do
+				if E.usages[name] then
+					for k,v in pairs(E.usages[name]) do
 						recipes[k]=true
 					end
 				end
@@ -193,9 +412,13 @@ function glcraft.get_craftables(inv,lname)
 		end
 	end
 	for k,v in pairs(craftables) do
-		table.sort(v,function(a,b) return (a.__reg_order or math.huge) < (b.__reg_order or math.huge) end)
+		E.sort_recipes(v)
 	end
 	return craftables
+end
+
+function E.sort_recipes(v)
+	table.sort(v,function(a,b) return (a.__reg_order or math.huge) < (b.__reg_order or math.huge) end)
 end
 
 function glcraft.craft(inv,ilname,olname,recipe,count,player,pos)
