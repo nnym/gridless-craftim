@@ -17,11 +17,22 @@ local rc=minetest.register_craft
 local ec=minetest.clear_craft
 
 local function hashinput(recipe)
+	local inp=recipe.recipe
+	if not inp then return "" end
+	if type(inp)=="string" then
+		inp={inp}
+	end
+	if type(inp[1])=="string" then
+		inp={inp}
+	end
 	local str={}
-	for k,v in ipairs(recipe.input) do
+	for y,v in ipairs(inp) do
 		local s={}
-		for k,v in ipairs(v) do
-			table.insert(s,minetest.encode_base64())
+		for x,v in ipairs(v) do
+			if type(v)~="string" then
+				error(dump{inp=inp,recipe=recipe})
+			end
+			table.insert(s,minetest.encode_base64(v))
 		end
 		table.insert(str,table.concat(s,","))
 	end
@@ -48,17 +59,17 @@ function minetest.clear_craft(...)
 	local recipe=...
 	if t[1] then
 		if recipe.output then
-			local out=ItemStack(recipe.output):get_name()
+			local out=ItemStack(recipe.output):to_string()
 			local crafts=minetest.registered_crafts[out]
 			for k,v in pairs(crafts) do
 				crafts[k]=nil
 			end
-		elseif recipe.input then
+		elseif recipe.recipe then
 			local clearables={}
 			local t=minetest.registered_crafts
 			for out,crafts in pairs(t) do
 				for r,_ in pairs(crafts) do
-					if ((not recipe.type) or recipe.type==r.type) or (hashinput(recipe)==hashinput(r)) then
+					if ((recipe.type==r.type) or not recipe.type) and (hashinput(recipe)==hashinput(r)) then
 						crafts[r]=nil
 						if not next(crafts) then
 							clearables[out]=true

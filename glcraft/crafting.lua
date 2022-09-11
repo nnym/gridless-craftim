@@ -30,6 +30,17 @@ function E.find_of_groups(items,groups)
 			end
 		end
 	end
+	local cl={}
+	for it,_ in pairs(gi) do
+		for _,group in pairs(groups) do
+			if (not E.item_groups[group]) or not E.item_groups[group].map[it] then
+				cl[it]=true
+			end
+		end
+	end
+	for k,v in pairs(cl) do
+		gi[k]=nil
+	end
 	return gi
 end
 

@@ -80,13 +80,11 @@ function E.item_button(data)
 		is_gr=true
 		local group=iname:sub(#gggg+1,-1)
 		E.scan_groups_now()
-		local its = E.item_groups[group] or {}
-		local its,iits={},its
-		local items=data.items or minetest.registered_items
-		for k,v in ipairs(iits.list) do
-			if items[v] then
-				table.insert(its,v)
-			end
+		local ggrs=E.parse_groups(iname)
+		local items=E.find_of_groups(data.items or minetest.registered_items,ggrs)
+		local its={}
+		for k,v in pairs(items) do
+			table.insert(its,k)
 		end
 		tooltip = "Any group:"..group
 		if its and #its>0 then
