@@ -1,4 +1,5 @@
 local shlocals=...
+local E=shlocals
 local W,H,SCALING=shlocals.W,shlocals.H,shlocals.SCALING
 local DEBUG_CG=false
 local display_recipe=shlocals.display_recipe
@@ -10,6 +11,9 @@ local function itemlist_form(data)
 	local form = 
 		"image_button[5,4;0.8,0.8;craftguide_prev_icon.png;glcraft_items_prev;]" ..
 		"image_button[7.2,4;0.8,0.8;craftguide_next_icon.png;glcraft_items_next;]" ..
+		"field[0.3,4.3;3,0.8;glcraft_items_filter;;"..(data.filter or "").."]" ..
+		"field_close_on_enter[glcraft_items_filter;false]"..
+		"image_button[2.8,4;0.8,0.8;craftguide_search_icon.png;glcraft_items_search;]" ..
 		("label[5.8,4.15;%s / %s]"):format(esc(minetest.colorize("yellow",data.page)),data.npages)
 	local off=(data.page-1)*(W*H)+1
 	for x=0,W-1 do
@@ -103,7 +107,8 @@ local function update_itemlist(player,first)
 			end
 		end
 		table.sort(items)
-		data.items=items
+		data._items=items
+		data.items=E.apply_filter(data._items,data.filter,pdata.info.lang_code)
 		data.npages=math.max(1,math.ceil(#items/(W*H)))
 		data.page=math.min(data.npages,data.page or 1)
 		if not first then
@@ -127,6 +132,13 @@ local function on_receive_fields(player,fields)
 		end
 		if p~=0 then
 			data.page=(data.page+p-1)%data.npages+1
+			return true
+		end
+		if fields.glcraft_items_search or fields.key_enter_field=="glcraft_items_filter" then
+			data.filter=fields.glcraft_items_filter
+			data.items=E.apply_filter(data._items,data.filter,pdata.info.lang_code)
+			data.npages=math.max(1,math.ceil(#data.items/(W*H)))
+			data.page=math.min(data.npages,data.page or 1)
 			return true
 		end
 		local ilb_pre="glcraft_items_item_"
@@ -200,12 +212,13 @@ local function make_data(player)
 	local name = player:get_player_name()
 	if player_data[name] then return end
 	player_data[name] = {}
+	player_data[name].info=minetest.get_player_information(name)
 	update_itemlist(player,true)
 end
 
 local function delete_data(player)
+	local name = player:get_player_name()
 	if not player_data[name] then return end
-        local name = player:get_player_name()
         player_data[name] = nil
 end
 

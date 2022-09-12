@@ -145,6 +145,45 @@ function E.display_recipe_raw(recipe,count,prefix,imap)
 	return form
 end
 
+function E.apply_filter(items,filter,lang)
+	if not filter or filter=="" then return items end
+	local lang=lang or "en"
+	local fitems = {}
+	local groups=E.parse_groups(filter)
+	if groups then
+		local iitems={}
+		for k,v in ipairs(items) do
+			iitems[v]=true
+		end
+		its=E.find_of_groups(iitems,groups)
+		for _,name in ipairs(items) do
+			local def=minetest.registered_items[name]
+			if its[name] then
+				table.insert(fitems,name)
+			end
+		end
+	else
+		for _,name in ipairs(items) do
+			local def=minetest.registered_items[name]
+			local desc=def.description or def.short_description
+			if desc then
+				desc=minetest.get_translated_string(lang,desc)
+			end
+			local matches=false
+			for k,v in ipairs{name,desc} do
+				local v,filter=v:lower(),filter:lower()
+				if v:find(filter) then
+					matches=true
+				end
+			end
+			if matches then
+				table.insert(fitems,name)
+			end
+		end
+	end
+	return fitems
+end
+
 E.include("crafting.lua",E)
 E.include("m_rebl_cks.lua",E)
 E.include("technic.lua",E)

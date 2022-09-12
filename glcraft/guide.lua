@@ -11,6 +11,9 @@ local function itemlist_form(data)
 	local form = 
 		"image_button[5,4;0.8,0.8;craftguide_prev_icon.png;glcraft_gitems_prev;]" ..
 		"image_button[7.2,4;0.8,0.8;craftguide_next_icon.png;glcraft_gitems_next;]" ..
+		"field[0.3,4.3;3,0.8;glcraft_gitems_filter;;"..(data.filter or "").."]" ..
+		"field_close_on_enter[glcraft_gitems_filter;false]"..
+		"image_button[2.8,4;0.8,0.8;craftguide_search_icon.png;glcraft_gitems_search;]" ..
 		("label[5.8,4.15;%s / %s]"):format(esc(minetest.colorize("yellow",data.page)),data.npages)
 	local off=(data.page-1)*(W*H)+1
 	for x=0,W-1 do
@@ -156,6 +159,9 @@ local function update_glodata()
 		glodata.crafts=crafts
 		glodata.usages=usages
 		glodata.imap=imap
+		for k,v in pairs(player_data) do
+			v.gld_dirty=true
+		end
 	end
 end
 
@@ -164,17 +170,21 @@ local function update_itemlist(player,first)
 	local name=player:get_player_name()
 	local pdata=player_data[name]
 	local data=pdata.items or {}
-	player_data[name].items=data
-	data.items=glodata.items
+	pdata.items=data
+	data.items=data.items or E.apply_filter(glodata.items,data.filter)
 	data.crafts=glodata.crafts
 	data.usages=glodata.usages
 	data.npages=math.max(1,math.ceil(#data.items/(W*H)))
 	data.page=math.min(data.npages,data.page or 1)
-	if data.gld_dirty then
-		data.gld_dirty=false
+	if pdata.gld_dirty then
+		data.items=E.apply_filter(glodata.items,data.filter,pdata.info.lang_code)
+		data.npages=math.max(1,math.ceil(#data.items/(W*H)))
+		data.page=math.min(data.npages,data.page or 1)
+		pdata.gld_dirty=false
 		sfinv.set_player_inventory_formspec(player)
 	end
 end
+
 
 local function on_receive_fields(player,fields)
 	local name=player:get_player_name()
@@ -193,6 +203,13 @@ local function on_receive_fields(player,fields)
 			data.page=(data.page+p-1)%data.npages+1
 			return true
 		end
+		if fields.glcraft_gitems_search or fields.key_enter_field=="glcraft_gitems_filter" then
+			data.filter=fields.glcraft_gitems_filter
+			data.items=E.apply_filter(glodata.items,data.filter,pdata.info.lang_code)
+			data.npages=math.max(1,math.ceil(#data.items/(W*H)))
+			data.page=math.min(data.npages,data.page or 1)
+			return true
+		end
 		local ilb_pre="glcraft_gitems_item_"
 		for k,v in pairs(fields) do
 			if k:sub(1,#ilb_pre)==ilb_pre then
@@ -200,7 +217,11 @@ local function on_receive_fields(player,fields)
 				it=minetest.decode_base64(it)
 				if it then
 					if it:sub(1,6)=="group:" then
-						--todo
+						data.filter=it
+						data.items=E.apply_filter(glodata.items,data.filter,pdata.info.lang_code)
+					data.npages=math.max(1,math.ceil(#data.items/(W*H)))
+					data.page=math.min(data.npages,data.page or 1)
+						return true
 					else
 						local it=ItemStack(it):get_name()
 						local recips
@@ -268,10 +289,12 @@ local function make_data(player)
 	local name = player:get_player_name()
 	if player_data[name] then return end
 	player_data[name] = {}
+	player_data[name].info=minetest.get_player_information(name)
 	update_itemlist(player,true)
 end
 
 local function delete_data(player)
+	local name = player:get_player_name()
 	if not player_data[name] then return end
         local name = player:get_player_name()
         player_data[name] = nil
