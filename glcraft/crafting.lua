@@ -194,12 +194,17 @@ local function scan_ur(recipe)
 		v=ItemStack(v):get_name()
 		v=E.resolve_alias(v)
 		if v~="" then
-			if v:sub(1,6)=="group:" then
-				local gg=E.item_groups[v:sub(7,-1)]
-				if gg then
-					for k,v in pairs(gg.list) do
-						E.usages[v]=E.usages[v] or {}
-						E.usages[v][recipe]=true
+			local groups=E.parse_groups(v)
+			if groups then
+				for _,gro in pairs(groups) do
+					local gg=E.item_groups[gro]
+					if gg then
+						for k,v in pairs(gg.list) do
+							if E.find_of_groups({[v]=true},groups)[v] then
+								E.usages[v]=E.usages[v] or {}
+								E.usages[v][recipe]=true
+							end
+						end
 					end
 				end
 			else
@@ -275,14 +280,15 @@ end
 
 local function check_recipe_input(inp,name)
 	local inp=inp
-	if inp:sub(1,6)=="group:" then
-		local gg=E.item_groups[inp:sub(7,-1)]
-		inp=(gg and gg.map[name]) and name or ""
+	local groups=E.parse_groups(inp)
+	if groups and E.find_of_groups({[name]=true},groups)[name] then
+		inp=name
 	end
+	print(dump{"CHECK RECIPE OUTPUT",inp=inp,name1=nn,name=name})
 	return name==inp
 end
 
-function E.display_recipe(recipe,count,prefix,compress,imap,gritem)
+function E.display_recipe(recipe,count,prefix,compress,imap,gritem,rand)
 	local count=count or 1
 	local grid,outputs={},{}
 	local shapeless
@@ -369,7 +375,7 @@ function E.display_recipe(recipe,count,prefix,compress,imap,gritem)
 			end
 		end
 	end
-	return E.display_recipe_raw({inputs=grid,outputs=outputs,recip_icon=recip_icon},count,prefix,imap)
+	return E.display_recipe_raw({inputs=grid,outputs=outputs,recip_icon=recip_icon},count,prefix,imap,rand)
 end
 
 function glcraft.get_craftables(inv,lname)

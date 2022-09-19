@@ -51,7 +51,7 @@ local function craftlist_form(data)
 	end
 	if data.recipe then
 		form=form.."container[0,0.5]"
-		form=form..display_recipe(data.recipe,data.count,nil,true,data.imap)
+		form=form..display_recipe(data.recipe,data.count,nil,true,data.imap,nil,E.rand_fn(data.rands))
 		form=form.."container_end[]"
 	end
 	return form
@@ -75,6 +75,17 @@ local function update_itemlist(player,first)
 	player_data[name].items=data
 	local oldinv=data.oldinv
 	local inv=player:get_inventory()
+	do
+		local cli=inv:get_list("craft")
+		local clpos=player:get_pos()
+		for k,v in ipairs(cli) do
+			if v:to_string()~="" then
+				minetest.handle_node_drops(clpos,{v:to_string()},player)
+				v:set_count(0)
+			end
+		end
+		inv:set_list("craft",cli)
+	end
 	local invl=dump(inv:get_list("main"))
 	if invl~=data.oldinv then
 		data.oldinv=invl
@@ -149,7 +160,8 @@ local function on_receive_fields(player,fields)
 				if it then
 					local recipes=data.crafts[it]
 					if recipes then
-						pdata.crafts={n=1,recipe=recipes[1],item=it,recipes=recipes,imap=data.imap}
+						pdata.crafts={n=1,recipe=recipes[1],item=it,recipes=recipes,imap=data.imap,
+						rands=math.random(2^31-1)}
 						return true
 					end
 				end
@@ -173,6 +185,7 @@ local function on_receive_fields(player,fields)
 				else
 					pdata.crafts=nil
 				end
+				data.rands=math.random(2^31-1)
 				return true
 			end
 			if p~=0 then
@@ -184,6 +197,7 @@ local function on_receive_fields(player,fields)
 						data.n=1
 						data.recipe=data.recipes[1]
 					end
+					data.rands=math.random(2^31-1)
 					return true
 				end
 			end
@@ -192,7 +206,8 @@ local function on_receive_fields(player,fields)
 				if k:sub(1,#ilb_pre)==ilb_pre and data.recipe then
 					local num=tonumber(k:sub(#ilb_pre+1,-1)) or 1
 					data.count=(data.count or 0)+num
-					return true
+					data.rands=math.random(2^31-1)
+					return true,true
 				end
 			end
 			if fields.glcraft_crafts_craft and data.recipe and data.count then
@@ -202,6 +217,7 @@ local function on_receive_fields(player,fields)
 					data.count=nil
 				end
 				update_itemlist(player)
+				data.rands=math.random(2^31-1)
 				return true
 			end
 		end
@@ -235,9 +251,18 @@ do
 		make_data(player)
 		return sfinv.make_formspec(player, context, get_formspec(player), true)
 	end
+	local job
         local on_player_receive_fields = function(self, player, context, fields)
-		if on_receive_fields(player,fields) then
-			sfinv.set_player_inventory_formspec(player)
+		local ok,dela=on_receive_fields(player,fields)
+		if ok then
+			if job then
+				job:cancel()
+			end
+			if dela then
+				job=minetest.after(0.5,sfinv.set_player_inventory_formspec,player)
+			else
+				sfinv.set_player_inventory_formspec(player)
+			end
 		end
         end
 	

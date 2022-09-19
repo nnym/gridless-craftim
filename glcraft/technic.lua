@@ -48,9 +48,11 @@ if minetest.get_modpath("technic") then
 					for y,v in pairs(recip.outputs) do
 						for y,v in pairs(v) do
 							local it=ItemStack(v):get_name()
-							E.recipes_custom[it]=E.recipes_custom[it] or {}
-							E.recipes_custom[it][recip]=true
-							rrr.its[it]=true
+							if it~="" then
+								E.recipes_custom[it]=E.recipes_custom[it] or {}
+								E.recipes_custom[it][recip]=true
+								rrr.its[it]=true
+							end
 						end
 					end
 					E.plan_recipe_scan()

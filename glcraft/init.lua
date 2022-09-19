@@ -70,6 +70,19 @@ end
 
 local esc = minetest.formspec_escape
 
+function E.rand_fn(...)
+	local pcg=PcgRandom(...)
+	return function(mi,ma)
+		if mi then
+			if mi and not ma then
+				mi,ma=1,mi
+			end
+			return pcg:next(mi,ma)
+		end
+		return (pcg:next()+(2^31))/(2^32-1)
+	end
+end
+
 function E.item_button(data)
 	local item=data.item
 	local is_gr,tooltip
@@ -86,9 +99,15 @@ function E.item_button(data)
 		for k,v in pairs(items) do
 			table.insert(its,k)
 		end
+		if #its==0 and data.items then
+			items=E.find_of_groups(minetest.registered_items,ggrs)
+			for k,v in pairs(items) do
+				table.insert(its,k)
+			end
+		end
 		tooltip = "Any group:"..group
 		if its and #its>0 then
-			it:set_name(its[math.random(1,#its)])
+			it:set_name(its[(data.rand or math.random)(1,#its)])
 		else
 			it:set_name("unknown")
 		end
@@ -104,7 +123,7 @@ function E.item_button(data)
 	       (tooltip and ("tooltip[%s;%s]"):format(esc(data.name),esc(tooltip)) or "")
 end
 
-local function display_cg(grid,count,prefix,leftha,imap)
+local function display_cg(grid,count,prefix,leftha,imap,rand)
 	local form=""
 	local hei=#grid
 	local wid=#grid[1]
@@ -122,6 +141,7 @@ local function display_cg(grid,count,prefix,leftha,imap)
 						x=x,y=y,
 						item=v,
 						items=imap,
+						rand=rand,
 						name=(prefix or "glcraft_unusedib_")..minetest.encode_base64(v),
 					}
 				elseif type(v)=="function" then
@@ -133,15 +153,15 @@ local function display_cg(grid,count,prefix,leftha,imap)
 	return form
 end
 
-function E.display_recipe_raw(recipe,count,prefix,imap)
+function E.display_recipe_raw(recipe,count,prefix,imap,rand)
 	local form="image[3,1;1,1;sfinv_crafting_arrow.png]"
 	if recipe.recip_icon then
 		form=form..
 		"image[3.15,0.15;0.75,0.75;"..recipe.recip_icon.icon.."]"..
 		"tooltip[3,0;0.8,0.8;"..recipe.recip_icon.tooltip.."]"
 	end
-	form=form..display_cg(recipe.inputs,count,prefix,true,imap)
-	form=form..display_cg(recipe.outputs,count,prefix,false,imap)
+	form=form..display_cg(recipe.inputs,count,prefix,true,imap,rand)
+	form=form..display_cg(recipe.outputs,count,prefix,false,imap,rand)
 	return form
 end
 

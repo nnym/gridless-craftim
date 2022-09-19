@@ -43,7 +43,11 @@ local function craftlist_form(data)
 		("label[4.8,8.55;%s %s / %s]"):format(modes[data.mode],esc(minetest.colorize("yellow",(data.recipe and #data.recipes>0) and data.n or "?")),#data.recipes))
 	if data.recipe then
 		form=form.."container[0,5]"
-		form=form..display_recipe(data.recipe,data.count,"glcraft_gitems_item_",nil,glodata.imap,data.mode=="usages" and data.item or nil)
+		form=form..display_recipe(
+			data.recipe,data.count,
+			"glcraft_gitems_item_",nil,
+			glodata.imap,data.mode=="usages" and data.item or nil,
+			E.rand_fn(data.rands))
 		form=form.."container_end[]"
 	end
 	return form
@@ -109,6 +113,7 @@ local function update_glodata()
 			end
 		end
 		local imap={}
+		local citems={}
 		for k,v in pairs(minetest.registered_items) do
 			local groups=v.groups or {}
 			local nici=groups.not_in_creative_inventory
@@ -123,26 +128,30 @@ local function update_glodata()
 				table.insert(items,k)
 				imap[k]=true
 			end
+			if k~="" and 
+			   (Erecipes[k] or E.recipes_custom[k] or Eusages[k]) then
+				table.insert(citems,k)
+			end
 		end
 		table.sort(items)
 		local crafts={}
 		local usages={}
-		for _,item in pairs(items) do
+		for _,item in pairs(citems) do
 			if Erecipes[item] then
-				crafts[item]=crafts[item] or {}
 				for recipe,_ in pairs(Erecipes[item]) do
+					crafts[item]=crafts[item] or {}
 					table.insert(crafts[item],recipe)
 				end
 			end
 			if E.recipes_custom[item] then
-				crafts[item]=crafts[item] or {}
 				for recipe,_ in pairs(E.recipes_custom[item]) do
+					crafts[item]=crafts[item] or {}
 					table.insert(crafts[item],recipe)
 				end
 			end
 			if Eusages[item] then
-				usages[item]=usages[item] or {}
 				for recipe,_ in pairs(Eusages[item]) do
+					usages[item]=usages[item] or {}
 					table.insert(usages[item],recipe)
 				end
 			end
@@ -159,9 +168,6 @@ local function update_glodata()
 		glodata.crafts=crafts
 		glodata.usages=usages
 		glodata.imap=imap
-		for k,v in pairs(player_data) do
-			v.gld_dirty=true
-		end
 	end
 end
 
@@ -251,7 +257,8 @@ local function on_receive_fields(player,fields)
 								}
 							end
 						end
-						pdata.crafts={n=1,recipe=recip,item=it,mode=mode,recipes=recips}
+						pdata.crafts={n=1,recipe=recip,item=it,mode=mode,recipes=recips,
+						rands=math.random(2^31-1)}
 						return true
 					end
 				end
@@ -278,6 +285,7 @@ local function on_receive_fields(player,fields)
 						data.n=1
 						data.recipe=data.recipes[1]
 					end
+					data.rands=math.random(2^31-1)
 					return true
 				end
 			end
@@ -313,9 +321,18 @@ do
 		make_data(player)
 		return sfinv.make_formspec(player, context, get_formspec(player))
 	end
+	local job
         local on_player_receive_fields = function(self, player, context, fields)
-		if on_receive_fields(player,fields) then
-			sfinv.set_player_inventory_formspec(player)
+		local ok,dela=on_receive_fields(player,fields)
+		if ok then
+			if job then
+				job:cancel()
+			end
+			if dela then
+				job=minetest.after(0.5,sfinv.set_player_inventory_formspec,player)
+			else
+				sfinv.set_player_inventory_formspec(player)
+			end
 		end
         end
 	
