@@ -284,7 +284,6 @@ local function check_recipe_input(inp,name)
 	if groups and E.find_of_groups({[name]=true},groups)[name] then
 		inp=name
 	end
-	print(dump{"CHECK RECIPE OUTPUT",inp=inp,name1=nn,name=name})
 	return name==inp
 end
 

@@ -187,7 +187,9 @@ local function update_itemlist(player,first)
 		data.npages=math.max(1,math.ceil(#data.items/(W*H)))
 		data.page=math.min(data.npages,data.page or 1)
 		pdata.gld_dirty=false
-		sfinv.set_player_inventory_formspec(player)
+		if sfinv.get_or_create_context(player).page==E.guide_page then
+			sfinv.set_player_inventory_formspec(player)
+		end
 	end
 end
 

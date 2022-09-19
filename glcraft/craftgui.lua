@@ -122,7 +122,7 @@ local function update_itemlist(player,first)
 		data.items=E.apply_filter(data._items,data.filter,pdata.info.lang_code)
 		data.npages=math.max(1,math.ceil(#items/(W*H)))
 		data.page=math.min(data.npages,data.page or 1)
-		if not first then
+		if not first and sfinv.get_or_create_context(player).page==E.craftgui_page then
 			sfinv.set_player_inventory_formspec(player)
 		end
 	end
@@ -267,13 +267,15 @@ do
         end
 	
 	if DEBUG_CG then
-		sfinv.register_page("glcraft:crafting",{
+		E.craftgui_page="glcraft:crafting"
+		sfinv.register_page(E.craftgui_page,{
 			title="Autocraft",
 			get=get,
 			on_player_receive_fields=on_player_receive_fields
 		})
 	else
-		sfinv.override_page("sfinv:crafting", {
+		E.craftgui_page="sfinv:crafting"
+		sfinv.override_page(E.craftgui_page, {
 			get=get,
 			on_player_receive_fields=on_player_receive_fields
 		})
