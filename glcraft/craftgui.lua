@@ -11,7 +11,7 @@ local function itemlist_form(data)
 	local form = 
 		"image_button[5,4;0.8,0.8;craftguide_prev_icon.png;glcraft_items_prev;]" ..
 		"image_button[7.2,4;0.8,0.8;craftguide_next_icon.png;glcraft_items_next;]" ..
-		"field[0.3,4.3;3,0.8;glcraft_items_filter;;"..(data.filter or "").."]" ..
+		"field[0.3,4.3;3,0.8;glcraft_items_filter;;"..esc(data.filter or "").."]" ..
 		"field_close_on_enter[glcraft_items_filter;false]"..
 		"image_button[2.8,4;0.8,0.8;craftguide_search_icon.png;glcraft_items_search;]" ..
 		("label[5.8,4.15;%s / %s]"):format(esc(minetest.colorize("yellow",data.page)),data.npages)

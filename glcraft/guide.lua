@@ -11,7 +11,7 @@ local function itemlist_form(data)
 	local form = 
 		"image_button[5,4;0.8,0.8;craftguide_prev_icon.png;glcraft_gitems_prev;]" ..
 		"image_button[7.2,4;0.8,0.8;craftguide_next_icon.png;glcraft_gitems_next;]" ..
-		"field[0.3,4.3;3,0.8;glcraft_gitems_filter;;"..(data.filter or "").."]" ..
+		"field[0.3,4.3;3,0.8;glcraft_gitems_filter;;"..esc(data.filter or "").."]" ..
 		"field_close_on_enter[glcraft_gitems_filter;false]"..
 		"image_button[2.8,4;0.8,0.8;craftguide_search_icon.png;glcraft_gitems_search;]" ..
 		("label[5.8,4.15;%s / %s]"):format(esc(minetest.colorize("yellow",data.page)),data.npages)
@@ -225,7 +225,7 @@ local function on_receive_fields(player,fields)
 				it=minetest.decode_base64(it)
 				if it then
 					if it:sub(1,6)=="group:" then
-						data.filter=it
+						data.filter=ItemStack(it):get_name()
 						data.items=E.apply_filter(glodata.items,data.filter,pdata.info.lang_code)
 					data.npages=math.max(1,math.ceil(#data.items/(W*H)))
 					data.page=math.min(data.npages,data.page or 1)
