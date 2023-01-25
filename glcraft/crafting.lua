@@ -150,7 +150,7 @@ function E.scan_recipes()
 			if type(v.drop)=="string" and v.drop~="" then
 				recip.outputs={{v.drop}}
 				oouts={ItemStack(v.drop):get_name()}
-			elseif type(v.drop)=="table" then
+			elseif type(v.drop)=="table" and v.drop.items then
 				local outs={}
 				for k,v in ipairs(v.drop.items) do
 					for k,v in ipairs(v.items) do
