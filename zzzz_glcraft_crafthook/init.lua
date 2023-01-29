@@ -4,13 +4,13 @@ if minetest.registered_crafts then return end
 local first=true
 local cou=0
 for k,v in pairs(minetest.registered_items) do
-	if v.mod_origin~="*builtin*" then
+	if minetest.get_all_craft_recipes(k) then
 		first=false
 	end
 end
 
 assert(first,
-"some mods loaded and might have registered crafting recipes before the" ..
+"some mods loaded and have registered crafting recipes before the" ..
 " craft hook could catch them. fail. dieing. committing self-destruct.")
 
 local rc=minetest.register_craft
