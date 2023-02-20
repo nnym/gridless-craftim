@@ -450,6 +450,7 @@ function glcraft.craft(inv,ilname,olname,recipe,count,player,pos)
 			for n=1,9 do
 				cg[n]=ItemStack()
 			end
+			local outsr={}
 			for k,inp in pairs(inputs) do
 				if inp~="" then
 					local satisfied=false
@@ -461,12 +462,16 @@ function glcraft.craft(inv,ilname,olname,recipe,count,player,pos)
 							break
 						end
 					end
-					for _,item in ipairs(outs) do
-						local name=item:get_name()
-						if name~="" and check_recipe_input(inp,name) then
-							cg[gg.recipe[k]]=item:take_item(1)
-							satisfied=true
-							break
+					if not satisfied then
+						for n,item in ipairs(outs) do
+							local name=item:get_name()
+							if name~="" and check_recipe_input(inp,name) then
+								local iit=ItemStack(item)
+								cg[gg.recipe[k]]=iit:take_item(1)
+								outsr[n]=iit
+								satisfied=true
+								break
+							end
 						end
 					end
 					if not satisfied then sati=false break end
@@ -499,6 +504,9 @@ function glcraft.craft(inv,ilname,olname,recipe,count,player,pos)
 					if v:get_count()>0 then
 						table.insert(outs,v)
 					end
+				end
+				for k,v in pairs(outsr) do
+					outs[k]=v
 				end
 				inv:set_list("craft",crl)
 				inv:set_list(ilname,il)
