@@ -173,14 +173,6 @@ local function on_receive_fields(player, data, fields)
 		local pdata=data
 		local data=data.crafts
 		if data then
-			local p=0
-			if fields.glcraft_crafts_prev then
-				p=p-1
-			end
-			if fields.glcraft_crafts_next then
-				p=p+1
-			end
-
 			if fields.key_enter_field == "glcraft_crafts_count" then
 				data.count = tonumber(fields.glcraft_crafts_count)
 				data.rands = math.random(2^31-1)
@@ -195,6 +187,14 @@ local function on_receive_fields(player, data, fields)
 			do return true end
 
 			::continue::
+
+			local p=0
+			if fields.glcraft_crafts_prev then
+				p=p-1
+			end
+			if fields.glcraft_crafts_next then
+				p=p+1
+			end
 
 			if p~=0 then
 				if #data.recipes>0 then
