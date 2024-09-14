@@ -123,7 +123,7 @@ if mbpath or tcpath or stpath then
 	end
 	if tcpath then
 		fakeenv()
-		dofile(tcpath.."/materials/init.lua")
+		dofile(tcpath.."/cnc_materials.lua")
 		realenv()
 	end
 	if stpath then
