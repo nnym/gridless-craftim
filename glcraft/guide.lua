@@ -332,20 +332,12 @@ do
 		make_data(player)
 		return sfinv.make_formspec(player, context, get_formspec(player))
 	end
-	local job
-        local on_player_receive_fields = function(self, player, context, fields)
-		local ok,dela=on_receive_fields(player,fields)
+    local on_player_receive_fields = function(self, player, context, fields)
+		local ok = on_receive_fields(player,fields)
 		if ok then
-			if job then
-				job:cancel()
-			end
-			if dela then
-				job=minetest.after(0.5,sfinv.set_player_inventory_formspec,player)
-			else
-				sfinv.set_player_inventory_formspec(player)
-			end
+			sfinv.set_player_inventory_formspec(player)
 		end
-        end
+    end
 	
 	if DEBUG_CG then
 		sfinv.register_page("glcraft:craftguide",{
