@@ -38,9 +38,10 @@ local function craftlist_form(data)
 	modes.recipes="Recipe"
 	modes.usages="Usage"
 	local form = 
-		("image_button[4,8.5;0.8,0.8;craftguide_prev_icon.png;glcraft_gcrafts_prev;]" ..
+		"button[3,8.5;1,0.8;glcraft_gitems_craft;Craft]" ..
+		"image_button[4,8.5;0.8,0.8;craftguide_prev_icon.png;glcraft_gcrafts_prev;]" ..
 		"image_button[7.2,8.5;0.8,0.8;craftguide_next_icon.png;glcraft_gcrafts_next;]" ..
-		("label[4.8,8.55;%s %s / %s]"):format(modes[data.mode],esc(minetest.colorize("yellow",(data.recipe and #data.recipes>0) and data.n or "?")),#data.recipes))
+		("label[4.8,8.55;%s %s / %s]"):format(modes[data.mode],esc(minetest.colorize("yellow",(data.recipe and #data.recipes>0) and data.n or "?")),#data.recipes)
 	if data.recipe then
 		form=form.."container[0,5]"
 		form=form..display_recipe(
@@ -271,6 +272,14 @@ local function on_receive_fields(player,fields)
 		local pdata=data
 		local data=data.crafts
 		if data then
+			if fields.glcraft_gitems_craft then
+				data.n = 1
+				data.rands = math.random(2^31-1)
+				glcraft_crafts_data[name].crafts = data
+				sfinv.set_page(player, E.craftgui_page)
+				return false
+			end
+
 			local p=0
 			if fields.glcraft_gcrafts_prev then
 				p=p-1
