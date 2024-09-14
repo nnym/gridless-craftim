@@ -35,25 +35,28 @@ end
 
 local function craftlist_form(data)
 	local form = 
-		(data.count and "button[5,4;3,0.8;glcraft_crafts_craft;Craft]" or
-		("image_button[5,4;0.8,0.8;craftguide_prev_icon.png;glcraft_crafts_prev;]" ..
-		"image_button[7.2,4;0.8,0.8;craftguide_next_icon.png;glcraft_crafts_next;]" ..
-		("label[5.8,4.15;%s / %s]"):format(esc(minetest.colorize("yellow",data.n or "?")),#data.recipes)))..
-		("button[0,4;0.8,0.8;glcraft_crafts_back;%s]"):format(data.count and esc("X") or esc("<-"))
+		(data.count and
+			"button[5,4;3,0.8;glcraft_crafts_craft;Craft]"
+			.. "button[0,3.3;0.8,0.8;glcraft_crafts_reset;X]"
+			or
+			("image_button[5,4;0.8,0.8;craftguide_prev_icon.png;glcraft_crafts_prev;]"
+			.. "image_button[7.2,4;0.8,0.8;craftguide_next_icon.png;glcraft_crafts_next;]"
+			.. ("label[5.8,4.15;%s / %s]"):format(esc(minetest.colorize("yellow", data.n or "?")), #data.recipes)))
+		.. ("field[3.2,4.65;0.9,0;glcraft_crafts_count;;%s]"):format(data.count or 0)
+		.. "field_close_on_enter[glcraft_crafts_count;false]"
+		.. "button[0,4;0.8,0.8;glcraft_crafts_back;<-]"
 		
-	if data.n then
-		for k,v in ipairs{"1","10","100"} do
-			form=form..("button[%s,4;0.9,0.8;glcraft_crafts_craft_%s;+%s]"):format((k-1)*0.7+0.7,v,v)
-		end
+	for k,v in ipairs{"1","10","100"} do
+		form = form .. ("button[%s,3.3;0.9,0.8;glcraft_crafts_craft_-%s;-%s]"):format(k * 0.7, v, v)
+		form = form .. ("button[%s,4;0.9,0.8;glcraft_crafts_craft_%s;+%s]"):format(k * 0.7, v, v)
 	end
-	if data.count then
-		form=form..("label[3,4.15;%s]"):format(data.count)
+
+	if data.recipe then form = form
+		.. "container[0,0.5]"
+		.. display_recipe(data.recipe, data.count, nil, true, data.imap, nil, E.rand_fn(data.rands))
+		.. "container_end[]"
 	end
-	if data.recipe then
-		form=form.."container[0,0.5]"
-		form=form..display_recipe(data.recipe,data.count,nil,true,data.imap,nil,E.rand_fn(data.rands))
-		form=form.."container_end[]"
-	end
+
 	return form
 	
 end
@@ -128,9 +131,7 @@ local function update_itemlist(player,first)
 	end
 end
 
-local function on_receive_fields(player,fields)
-	local name=player:get_player_name()
-	local data=player_data[name]
+local function on_receive_fields(player, data, fields)
 	do -- Items list
 		local pdata=data
 		local data=data.items
@@ -179,15 +180,22 @@ local function on_receive_fields(player,fields)
 			if fields.glcraft_crafts_next then
 				p=p+1
 			end
-			if fields.glcraft_crafts_back then
-				if data.count then
-					data.count=nil
-				else
-					pdata.crafts=nil
-				end
-				data.rands=math.random(2^31-1)
-				return true
+
+			if fields.key_enter_field == "glcraft_crafts_count" then
+				data.count = tonumber(fields.glcraft_crafts_count)
+				data.rands = math.random(2^31-1)
+				return true, true
 			end
+
+			if fields.glcraft_crafts_reset then data.count = nil
+			elseif fields.glcraft_crafts_back then pdata.crafts = nil
+			else goto continue end
+
+			data.rands=math.random(2^31-1)
+			do return true end
+
+			::continue::
+
 			if p~=0 then
 				if #data.recipes>0 then
 					if data.n then
@@ -201,21 +209,18 @@ local function on_receive_fields(player,fields)
 					return true
 				end
 			end
-			local ilb_pre="glcraft_crafts_craft_"
 			for k,v in pairs(fields) do
-				if k:sub(1,#ilb_pre)==ilb_pre and data.recipe then
-					local num=tonumber(k:sub(#ilb_pre+1,-1)) or 1
-					data.count=(data.count or 0)+num
-					data.rands=math.random(2^31-1)
-					return true,true
+				local delta = tonumber((k:gsub("^glcraft_crafts_craft_", "")))
+
+				if delta and data.recipe then
+					data.count = (data.count or 0) + delta
+					data.rands = math.random(2^31-1)
+					return true, true
 				end
 			end
 			if fields.glcraft_crafts_craft and data.recipe and data.count then
 				local c=glcraft.craft(player:get_inventory(),"main","main",data.recipe,data.count,player)
 				data.count=data.count-c
-				if data.count<=0 then
-					data.count=nil
-				end
 				update_itemlist(player)
 				data.rands=math.random(2^31-1)
 				return true
@@ -251,20 +256,14 @@ do
 		make_data(player)
 		return sfinv.make_formspec(player, context, get_formspec(player), true)
 	end
-	local job
-        local on_player_receive_fields = function(self, player, context, fields)
-		local ok,dela=on_receive_fields(player,fields)
+    local on_player_receive_fields = function(self, player, context, fields)
+    	local data = player_data[player:get_player_name()]
+		local ok = on_receive_fields(player, data, fields)
+		if data.crafts and ((data.crafts.count or 0) <= 0) then data.crafts.count = nil end
 		if ok then
-			if job then
-				job:cancel()
-			end
-			if dela then
-				job=minetest.after(0.5,sfinv.set_player_inventory_formspec,player)
-			else
-				sfinv.set_player_inventory_formspec(player)
-			end
+			sfinv.set_player_inventory_formspec(player)
 		end
-        end
+    end
 	
 	if DEBUG_CG then
 		E.craftgui_page="glcraft:crafting"
