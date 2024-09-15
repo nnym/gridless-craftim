@@ -5,7 +5,7 @@ local DEBUG_CG=false
 local display_recipe=shlocals.display_recipe
 local esc = minetest.formspec_escape
 
-glcraft_crafts_data = {}
+glcraft.crafts_data = {}
 
 local function itemlist_form(data)
 	local form = 
@@ -63,7 +63,7 @@ end
 
 local function get_formspec(player)
 	local name = player:get_player_name()
-	local data = glcraft_crafts_data[name]
+	local data = glcraft.crafts_data[name]
 	if data.crafts then
 		return craftlist_form(data.crafts)
 	end
@@ -73,9 +73,9 @@ end
 local function update_itemlist(player,first)
 	local name=player:get_player_name()
 	local items={}
-	local pdata=glcraft_crafts_data[name]
+	local pdata=glcraft.crafts_data[name]
 	local data=pdata.items or {}
-	glcraft_crafts_data[name].items=data
+	glcraft.crafts_data[name].items=data
 	local oldinv=data.oldinv
 	local inv=player:get_inventory()
 	do
@@ -176,17 +176,19 @@ local function on_receive_fields(player, data, fields)
 			if fields.key_enter_field == "glcraft_crafts_count" then
 				data.count = tonumber(fields.glcraft_crafts_count)
 				data.rands = math.random(2^31-1)
-				return true, true
+				return true
 			end
 
-			if fields.glcraft_crafts_reset then data.count = nil
-			elseif fields.glcraft_crafts_back then pdata.crafts = nil
-			else goto continue end
+			local reset = fields.glcraft_crafts_reset
 
-			data.rands=math.random(2^31-1)
-			do return true end
+			if reset or fields.glcraft_crafts_back then
+				if reset then data.count = nil
+				else pdata.crafts = nil
+				end
 
-			::continue::
+				data.rands=math.random(2^31-1)
+				return true
+			end
 
 			local p=0
 			if fields.glcraft_crafts_prev then
@@ -215,7 +217,7 @@ local function on_receive_fields(player, data, fields)
 				if delta and data.recipe then
 					data.count = (data.count or 0) + delta
 					data.rands = math.random(2^31-1)
-					return true, true
+					return true
 				end
 			end
 			if fields.glcraft_crafts_craft and data.recipe and data.count then
@@ -231,16 +233,16 @@ end
 
 local function make_data(player)
 	local name = player:get_player_name()
-	if glcraft_crafts_data[name] then return end
-	glcraft_crafts_data[name] = {}
-	glcraft_crafts_data[name].info=minetest.get_player_information(name)
+	if glcraft.crafts_data[name] then return end
+	glcraft.crafts_data[name] = {}
+	glcraft.crafts_data[name].info=minetest.get_player_information(name)
 	update_itemlist(player,true)
 end
 
 local function delete_data(player)
 	local name = player:get_player_name()
-	if not glcraft_crafts_data[name] then return end
-        glcraft_crafts_data[name] = nil
+	if not glcraft.crafts_data[name] then return end
+        glcraft.crafts_data[name] = nil
 end
 
 minetest.register_on_joinplayer(make_data)
@@ -257,7 +259,7 @@ do
 		return sfinv.make_formspec(player, context, get_formspec(player), true)
 	end
     local on_player_receive_fields = function(self, player, context, fields)
-    	local data = glcraft_crafts_data[player:get_player_name()]
+    	local data = glcraft.crafts_data[player:get_player_name()]
 		local ok = on_receive_fields(player, data, fields)
 		if data.crafts and ((data.crafts.count or 0) <= 0) then data.crafts.count = nil end
 		if ok then

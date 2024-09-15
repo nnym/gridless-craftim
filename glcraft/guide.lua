@@ -275,7 +275,7 @@ local function on_receive_fields(player,fields)
 			if fields.glcraft_gitems_craft then
 				data.n = 1
 				data.rands = math.random(2^31-1)
-				glcraft_crafts_data[name].crafts = data
+				glcraft.crafts_data[name].crafts = data
 				sfinv.set_page(player, E.craftgui_page)
 				return false
 			end
